@@ -22,6 +22,15 @@ namespace dataflow
     Memory *Result = new Memory();
     /* Add your code here */
 
+    for (auto pair = M1->begin(); pair != M1->end(); ++pair)
+    {
+      Result->insert({pair->first, pair->second});
+    }
+    for (auto pair = M2->begin(); pair != M2->end(); ++pair)
+    {
+      Result->insert({pair->first, pair->second});
+    }
+
     /* Result will be the union of memories M1 and M2 */
 
     return Result;
@@ -31,11 +40,34 @@ namespace dataflow
   {
     /* Add your code here */
     /* Return true if the two memories M1 and M2 are equal */
+    for (auto m1 = M1->begin(), m2 = M2->begin();
+         m1 != M1->end() || m2 != M2->end(); ++m1, ++m2)
+    {
+
+    }
   }
 
   void DivZeroAnalysis::flowIn(Instruction *I, Memory *In)
   {
     /* Add your code here */
+    // joining all OUT sets of incoming flows and saving the result in the In set
+    std::vector<Instruction *> predecessors = getPredecessors(I);
+    Domain d = Domain(Domain::Uninit);
+    for (Instruction *predecessor : predecessors)
+    {
+      // populate In, which is a hash table {string : Domain *}
+      Memory *outN = OutMap[predecessor];
+      Domain *temp = outN->at(variable(predecessor));
+      if (d.Value == Domain::Uninit)
+      {
+        d = *temp;
+      }
+      else
+      {
+        d = *Domain::join(&d, temp);
+      }
+    }
+    In->insert({variable(I), &d});
   }
 
   void DivZeroAnalysis::transfer(Instruction *I, const Memory *In, Memory *NOut)
@@ -45,7 +77,7 @@ namespace dataflow
     {
       outs() << "Binary operator: " << *BO << "\n";
       Value *op1 = BO->getOperand(0);
-      Value *op2 = BO->getOperand(2);
+      Value *op2 = BO->getOperand(1);
       Domain *d1;
       Domain *d2;
 
@@ -150,11 +182,28 @@ namespace dataflow
   bool DivZeroAnalysis::check(Instruction *I)
   {
     /* Add your code here */
-    
-    return false;
-  }
+    Memory *mem = InMap[I];
+    Domain *d = mem->at(variable(I));
+    if (BinaryOperator *BO = dyn_cast<BinaryOperator>(I))
+    {
+      switch (BO->getOpcode())
+      {
+      case Instruction::SDiv:
+      case Instruction::UDiv:
+        Value *op1 = BO->getOperand(0);
+        Value *op2 = BO->getOperand(1);
+        int *i = cast<int>(op2);
+        Domain *res = Domain::abstract(*i);
+        if (res->Value == Domain::Zero)
+        {
+          return true;
+        }
+      }
 
-  char DivZeroAnalysis::ID = 1;
-  static RegisterPass<DivZeroAnalysis> X("DivZero", "Divide-by-zero Analysis",
-                                         false, false);
-} // namespace dataflow
+      return false;
+    }
+
+    char ID = 1;
+    static RegisterPass<DivZeroAnalysis> X("DivZero", "Divide-by-zero Analysis",
+                                           false, false);
+  } // namespace dataflow
