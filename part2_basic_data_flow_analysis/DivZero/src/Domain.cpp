@@ -74,10 +74,49 @@ dataflow::Domain *dataflow::Domain::mul(Domain *E1, Domain *E2)
 
 dataflow::Domain *dataflow::Domain::div(Domain *E1, Domain *E2)
 {
-    return nullptr;
+    dataflow::Domain::Element e1 = E1->Value;
+    dataflow::Domain::Element e2 = E1->Value;
+    dataflow::Domain e3 = dataflow::Domain();
+
+    // if both are 0, undefined
+    // if either are 0, undefined
+    // if neither are 0, nonZero
+
+    if (e1 == dataflow::Domain::Uninit || e2 == dataflow::Domain::Uninit || e1 == dataflow::Domain::MaybeZero || e2 == dataflow::Domain::MaybeZero)
+    {
+        e3.Value = dataflow::Domain::MaybeZero;
+    }
+    else if (e2 == dataflow::Domain::Zero)
+    {
+        // undefined behavior, division by 0 error
+        e3.Value = dataflow::Domain::MaybeZero;
+    }
+    else if (e1 == dataflow::Domain::Zero)
+    {
+        // at this point, we know e2 is not 0, e1 is 0, thus, 0 / x = 0
+        e3.Value = dataflow::Domain::Zero;
+    }
+
+    return &e3;
 }
 
 dataflow::Domain *dataflow::Domain::join(Domain *E1, Domain *E2)
 {
-    return nullptr;
+    dataflow::Domain::Element e1 = E1->Value;
+    dataflow::Domain::Element e2 = E1->Value;
+    dataflow::Domain e3 = dataflow::Domain();
+
+    // if they are the same, it's just that
+    // if one is 0 and one is nonzero, maybezero
+
+    if (e1 == dataflow::Domain::Uninit || e2 == dataflow::Domain::Uninit || e1 == dataflow::Domain::MaybeZero || e2 == dataflow::Domain::MaybeZero)
+    {
+        e3.Value = dataflow::Domain::MaybeZero;
+    } else if (e1 == e2) {
+        e3.Value = e1;
+    } else {
+        e3.Value = dataflow::Domain::MaybeZero;
+    }
+
+    return &e3;
 }
