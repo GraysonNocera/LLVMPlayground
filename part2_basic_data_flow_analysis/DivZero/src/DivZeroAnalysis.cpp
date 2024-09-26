@@ -38,6 +38,54 @@ void DivZeroAnalysis::flowIn(Instruction *I, Memory *In) {
 
 void DivZeroAnalysis::transfer(Instruction *I, const Memory *In, Memory *NOut) {
   /* Add your code here */
+
+  if (BinaryOperator *BO = dyn_cast<BinaryOperator>(I)) {
+    outs() << "Binary operator: " << *BO << "\n";
+    Value *op1 = BO->getOperand(0);
+    Value *op2 = BO->getOperand(2);
+    Domain * d1;
+    Domain * d2;
+
+    if (In->find(variable(op1)) == In->end()) {
+      d1 = &Domain();
+      d1->Value = Domain::Uninit;
+    } else {
+      d1 = In->at(variable(op1));
+    }
+
+    if (In->find(variable(op2)) == In->end()) {
+      d2 = &Domain();
+      d2->Value = Domain::Uninit;
+    } else {
+      d2 = In->at(variable(op2));
+    }
+    switch (BO->getOpcode())
+    {
+    case Instruction::Add:
+      NOut->insert({variable(I), Domain::add(d1, d2)});
+      break;
+    case Instruction::Sub: 
+      NOut->insert({variable(I), Domain::sub(d1, d2)});
+      break;
+    case Instruction::Mul: 
+      NOut->insert({variable(I), Domain::mul(d1, d2)});
+      break;
+    case Instruction::SDiv: case Instruction::UDiv:
+      NOut->insert({variable(I), Domain::div(d1, d2)});
+      break;
+    }
+    outs() << "Nout for add " << NOut->at(variable(I)) << "\n";
+  } else if (CastInst *CastI = dyn_cast<CastInst>(I)) {
+
+  } else if (CmpInst *CmpI = dyn_cast<CmpInst>(I)) {
+
+  } else if (BranchInst *BI = dyn_cast<BranchInst>(I)) {
+
+  } else if (isInput(I)) {
+
+  } else if (PHINode *P = dyn_cast<PHINode>(I)) {
+
+  }
 }
 
 void DivZeroAnalysis::flowOut(Instruction *I, Memory *Pre, Memory *Post,  SetVector <Instruction *> &WorkSet) {
@@ -47,7 +95,12 @@ void DivZeroAnalysis::flowOut(Instruction *I, Memory *Pre, Memory *Post,  SetVec
 void DivZeroAnalysis::doAnalysis(Function &F) { 
   SetVector<Instruction *> WorkSet;
   for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I) {
+    I->dump();
+    outs() << I->getType() << I->getName() << "\n";
     WorkSet.insert(&(*I));
+    // if (BinaryOperator *BO = dyn_cast<BinaryOperator *>(I)) {
+    //   outs() << "Binary operator: " << *BO << "\n";
+    // } 
   }
 
   /* Add your code here */

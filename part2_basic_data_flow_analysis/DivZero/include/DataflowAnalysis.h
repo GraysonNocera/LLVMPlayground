@@ -20,11 +20,15 @@ using namespace llvm;
 
 namespace dataflow {
 
+// mapping from llvm variables to abstract values
 using Memory = std::map<std::string, Domain *>;
 
 std::string variable(Value *);
 
 struct DataflowAnalysis : public FunctionPass {
+
+  // store abstract state before and after instruction
+  // abstract state - mapping from llvm variables to abstract values
   ValueMap<Instruction *, Memory *> InMap;
   ValueMap<Instruction *, Memory *> OutMap;
   SetVector<Instruction *> ErrorInsts;
@@ -32,6 +36,7 @@ struct DataflowAnalysis : public FunctionPass {
   DataflowAnalysis(char ID);
   void collectErrorInsts(Function &F);
   bool runOnFunction(Function &F) override;
+  Domain *evalPhiNode(PHINode *PHI, const Memory *Mem);
 
 protected:
   virtual void transfer(Instruction *I, const Memory *In, Memory *NOut) = 0;
