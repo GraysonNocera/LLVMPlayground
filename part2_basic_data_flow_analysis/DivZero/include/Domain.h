@@ -30,6 +30,7 @@ public:
   static Domain *div(Domain *E1, Domain *E2);
   static Domain *join(Domain *E1, Domain *E2);
   static bool order(Domain E1, Domain E2);
+  static dataflow::Domain *abstract(int i);
   void print(raw_ostream &O);
 };
 

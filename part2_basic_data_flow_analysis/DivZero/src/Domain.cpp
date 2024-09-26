@@ -120,3 +120,16 @@ dataflow::Domain *dataflow::Domain::join(Domain *E1, Domain *E2)
 
     return &e3;
 }
+
+dataflow::Domain *dataflow::Domain::abstract(int i)
+{
+    dataflow::Domain::Element e1;
+    dataflow::Domain d;
+    if (i == 0) {
+        e1 = dataflow::Domain::Zero;
+    } else {
+        e1 = dataflow::Domain::NonZero;
+    }
+    d.Value = e1;
+    return &d;
+}

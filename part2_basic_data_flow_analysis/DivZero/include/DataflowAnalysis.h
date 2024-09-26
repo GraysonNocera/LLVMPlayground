@@ -36,7 +36,7 @@ struct DataflowAnalysis : public FunctionPass {
   DataflowAnalysis(char ID);
   void collectErrorInsts(Function &F);
   bool runOnFunction(Function &F) override;
-  Domain *evalPhiNode(PHINode *PHI, const Memory *Mem);
+  Domain *evalPhiNode(PHINode *PHI, Memory *Mem);
 
 protected:
   virtual void transfer(Instruction *I, const Memory *In, Memory *NOut) = 0;

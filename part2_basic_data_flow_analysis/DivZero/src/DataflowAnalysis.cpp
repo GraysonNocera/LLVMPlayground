@@ -70,23 +70,48 @@ namespace dataflow
     return false;
   }
 
-  Domain *DataflowAnalysis::evalPhiNode(PHINode *PHI, const Memory *Mem)
+  Domain *DataflowAnalysis::evalPhiNode(PHINode *PHI, Memory *Mem)
   {
     Value *cv = PHI->hasConstantValue();
     if (cv)
     {
-      // eval cv, manipulate Mem, return
+      Domain *d;
+      if (Mem->find(variable(cv)) == Mem->end())
+      {
+        d = &Domain();
+        d->Value = Domain::Uninit;
+      }
+      else
+      {
+        d = Mem->at(variable(cv));
+      }
+      Mem->insert({variable(cv), d});
+      return d;
     }
+
     unsigned int n = PHI->getNumIncomingValues();
     Domain *joined = NULL;
     for (unsigned int i = 0; i < n; i++)
     {
-      Domain *V = // eval PHI->getIncomingValue(i), manipulate Mem
-          if (!joined)
+      // eval PHI->getIncomingValue(i), manipulate Mem
+      Value *V = PHI->getIncomingValue(i);
+      Domain *d;
+      if (Mem->find(variable(cv)) == Mem->end())
       {
-        joined = V;
+        d = &Domain();
+        d->Value = Domain::Uninit;
       }
-      joined = Domain::join(joined, V);
+      else
+      {
+        d = Mem->at(variable(cv));
+      }
+      if (!joined)
+      {
+        joined = d;
+      }
+      joined = Domain::join(joined, d);
+      // is this right?
+      Mem->insert({variable(V), d});
     }
     return joined;
   }
