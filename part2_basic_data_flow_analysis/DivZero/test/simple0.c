@@ -6,5 +6,6 @@ int main() {
   if (c) {
     int a = 1;
   }
+  char i = (char) a;
   return 0;
 }

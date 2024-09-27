@@ -116,6 +116,12 @@ namespace dataflow
 
         // BI->getSuccessor(1)->dump(); // basically gets the else
       }
+      if (CastInst *CI = dyn_cast<CastInst>(&*I)) {
+        outs() << "CAST INSTRUCTION\n";
+        outs() << CI->getOpcodeName() << "\n";
+        CI->getOperand(0)->dump();
+        CI->getDestTy()->dump();
+      }
       WorkSet.insert(&(*I));
       outs() << "\n\n\n";
     }
