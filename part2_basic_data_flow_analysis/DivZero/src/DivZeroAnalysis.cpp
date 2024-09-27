@@ -112,17 +112,27 @@ namespace dataflow
   void DivZeroAnalysis::transfer(Instruction *I, const Memory *In, Memory *NOut)
   {
     /* Add your code here */
+    for (auto in = In->begin(); in != In->end(); in++)
+    {
+      NOut->insert({in->first, in->second});
+    }
+
     if (BinaryOperator *BO = dyn_cast<BinaryOperator>(I))
     {
-      outs() << "Binary operator: " << *BO << "\n";
+      outs() << "Binary operator \n";
       Value *op1 = BO->getOperand(0);
       Value *op2 = BO->getOperand(1);
-      Domain *d1 = new Domain();
-      Domain *d2 = new Domain();
+      Domain *d1 = new Domain(Domain::Uninit);
+      Domain *d2 = new Domain(Domain::Uninit);
 
+      // rational: if we find the variable in incoming hashmap, use it,
+      // otherwise, if we see a constant, set that domain explicitly
       if (In->find(variable(op1)) == In->end())
       {
-        d1->Value = Domain::Uninit;
+        if (ConstantInt *i = dyn_cast<ConstantInt>(op1))
+        {
+          d1->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+        }
       }
       else
       {
@@ -131,12 +141,16 @@ namespace dataflow
 
       if (In->find(variable(op2)) == In->end())
       {
-        d2->Value = Domain::Uninit;
+        if (ConstantInt *i = dyn_cast<ConstantInt>(op2))
+        {
+          d2->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+        }
       }
       else
       {
         d2 = In->at(variable(op2));
       }
+
       switch (BO->getOpcode())
       {
       case Instruction::Add:
@@ -157,37 +171,140 @@ namespace dataflow
     }
     else if (CastInst *CastI = dyn_cast<CastInst>(I))
     {
-      // identity
-      Domain *d = In->at(variable(I));
+      // not worrying about overflow and underflow here
+      Value *op1 = CastI->getOperand(0);
+      Domain *d = new Domain(Domain::Uninit);
+      if (In->find(variable(op1)) == In->end())
+      {
+        if (ConstantInt *i = dyn_cast<ConstantInt>(op1))
+        {
+          d->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+        }
+      }
+      else
+      {
+        d = In->at(variable(op1));
+      }
       NOut->insert({variable(I), d});
     }
     else if (CmpInst *CmpI = dyn_cast<CmpInst>(I))
     {
-      Value *result = I;
-      // if (int *intResult = dyn_cast<int>(result->getType()))
-      // {
-      //   Domain *d = Domain::abstract(*intResult);
-      //   NOut->insert({variable(I), d});
-      // }
-      Domain *d = new Domain();
-      d->Value = Domain::Uninit;
+      Value *op1 = BO->getOperand(0);
+      Value *op2 = BO->getOperand(1);
+      Domain *d1 = new Domain(Domain::Uninit);
+      Domain *d2 = new Domain(Domain::Uninit);
+      Domain *d3 = new Domain(Domain::Uninit);
+
+      // rational: if we find the variable in incoming hashmap, use it,
+      // otherwise, if we see a constant, set that domain explicitly
+      if (In->find(variable(op1)) == In->end())
+      {
+        if (ConstantInt *i = dyn_cast<ConstantInt>(op1))
+        {
+          d1->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+        }
+      }
+      else
+      {
+        d1 = In->at(variable(op1));
+      }
+
+      if (In->find(variable(op2)) == In->end())
+      {
+        if (ConstantInt *i = dyn_cast<ConstantInt>(op2))
+        {
+          d2->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+        }
+      }
+      else
+      {
+        d2 = In->at(variable(op2));
+      }
+
+      if (d1->Value == Domain::MaybeZero || d2->Value == Domain::MaybeZero)
+      {
+        d3->Value = Domain::MaybeZero;
+      }
+      else if (d1->Value == Domain::Uninit || d2->Value == Domain::Uninit)
+      {
+        d3->Value = Domain::Uninit;
+      }
+      else
+      {
+        // at this point, we know that neither are MaybeZero or Uninit
+        switch (CmpI->getPredicate())
+        {
+        case CmpInst::ICMP_EQ:
+          if (d1->Value == Domain::Zero && d2->Value == Domain::Zero)
+          {
+            d3->Value = Domain::NonZero;
+          }
+          else if (d1->Value == Domain::NonZero && d2->Value == Domain::NonZero)
+          {
+            d3->Value = Domain::MaybeZero;
+          }
+          else
+          {
+            d3->Value = Domain::Zero;
+          }
+          break;
+        case CmpInst::ICMP_NE:
+          if (d1->Value == Domain::Zero && d2->Value == Domain::Zero)
+          {
+            d3->Value = Domain::Zero;
+          }
+          else if (d1->Value == Domain::NonZero && d2->Value == Domain::NonZero)
+          {
+            d3->Value = Domain::MaybeZero;
+          }
+          else
+          {
+            d3->Value = Domain::NonZero;
+          }
+        case CmpInst::ICMP_SGE:
+        case CmpInst::ICMP_UGE:
+        case CmpInst::ICMP_SLE:
+        case CmpInst::ICMP_ULE:
+          if (d1->Value == Domain::Zero && d2->Value == Domain::Zero)
+          {
+            d3->Value = Domain::NonZero;
+          }
+          else
+          {
+            d3->Value = Domain::MaybeZero;
+          }
+          break;
+        case CmpInst::ICMP_SGT:
+        case CmpInst::ICMP_UGT:
+        case CmpInst::ICMP_SLT:
+        case CmpInst::ICMP_ULT:
+          if (d1->Value == Domain::Zero && d2->Value == Domain::Zero)
+          {
+            d3->Value = Domain::Zero;
+          }
+          else
+          {
+            d3->Value = Domain::MaybeZero;
+          }
+          break;
+        }
+      }
+      NOut->insert({variable(I), d3});
     }
     else if (BranchInst *BI = dyn_cast<BranchInst>(I))
     {
-      Domain *d = In->at(variable(I));
-      NOut->insert({variable(I), d});
+      // nothing to do here? we don't get any new variables or anything
     }
     else if (isInput(I))
     {
-      // int *c = cast<int>(I);
-      // Domain *d = Domain::abstract(*c);
-      Domain * d = new Domain(Domain::Uninit);
+      // getchar() returns int -> maybeZero
+      Domain *d = new Domain(Domain::MaybeZero);
       NOut->insert({variable(I), d});
     }
     else if (PHINode *P = dyn_cast<PHINode>(I))
     {
+      // evalPhiNode manipulated NOut
       Domain *d = evalPhiNode(P, NOut);
-      NOut->insert({variable(I), d});
     }
   }
 
@@ -201,8 +318,8 @@ namespace dataflow
       WorkSet.insert(I);
     }
 
-    Memory * mem = OutMap[I];
-    Memory * joined = join(mem, Post);
+    Memory *mem = OutMap[I];
+    Memory *joined = join(mem, Post);
     OutMap[I] = joined;
   }
 
@@ -227,16 +344,17 @@ namespace dataflow
          Based on the previous Out memory and the current Out memory, check if there is a difference between the two and
            flow the memory set appropriately to all successors of I and update WorkSet accordingly
     */
-   while (WorkSet.size() > 0) {
-    Instruction * I = WorkSet.back();
-    WorkSet.pop_back();
+    while (WorkSet.size() > 0)
+    {
+      Instruction *I = WorkSet.back();
+      WorkSet.pop_back();
 
-    flowIn(I, InMap[I]);
+      flowIn(I, InMap[I]);
 
-    transfer(I, InMap[I], OutMap[I]);
+      transfer(I, InMap[I], OutMap[I]);
 
-    flowOut(I, InMap[I], OutMap[I], WorkSet);
-   }
+      flowOut(I, InMap[I], OutMap[I], WorkSet);
+    }
   }
 
   bool DivZeroAnalysis::check(Instruction *I)
@@ -258,7 +376,7 @@ namespace dataflow
         // {
         //   return true;
         // }
-        Domain * d = new Domain(Domain::Uninit);
+        Domain *d = new Domain(Domain::Uninit);
       }
 
       return false;

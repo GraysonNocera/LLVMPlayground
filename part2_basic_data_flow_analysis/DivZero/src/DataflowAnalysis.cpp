@@ -75,42 +75,47 @@ namespace dataflow
     Value *cv = PHI->hasConstantValue();
     if (cv)
     {
-      Domain *d = new Domain();
+      Domain *d = new Domain(Domain::Uninit);
       if (Mem->find(variable(cv)) == Mem->end())
       {
-        d->Value = Domain::Uninit;
+        if (ConstantInt *i = dyn_cast<ConstantInt>(cv))
+        {
+          d->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+        }
       }
       else
       {
         d = Mem->at(variable(cv));
       }
-      Mem->insert({variable(cv), d});
+      Mem->insert({variable(PHI), d});
       return d;
     }
 
     unsigned int n = PHI->getNumIncomingValues();
-    Domain *joined = NULL;
+    Domain *joined = nullptr;
     for (unsigned int i = 0; i < n; i++)
     {
-      // eval PHI->getIncomingValue(i), manipulate Mem
       Value *V = PHI->getIncomingValue(i);
-      Domain *d = new Domain();
-      if (Mem->find(variable(cv)) == Mem->end())
+      Domain *d = new Domain(Domain::Uninit);
+      if (Mem->find(variable(V)) == Mem->end())
       {
-        d->Value = Domain::Uninit;
+        if (ConstantInt *i = dyn_cast<ConstantInt>(V))
+        {
+          d->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+        }
       }
       else
       {
-        d = Mem->at(variable(cv));
+        d = Mem->at(variable(V));
       }
+
       if (!joined)
       {
         joined = d;
       }
       joined = Domain::join(joined, d);
-      // is this right?
-      Mem->insert({variable(V), d});
     }
+    Mem->insert({variable(PHI), joined});
     return joined;
   }
 } // namespace dataflow
