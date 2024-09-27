@@ -75,10 +75,9 @@ namespace dataflow
     Value *cv = PHI->hasConstantValue();
     if (cv)
     {
-      Domain *d;
+      Domain *d = new Domain();
       if (Mem->find(variable(cv)) == Mem->end())
       {
-        d = &Domain();
         d->Value = Domain::Uninit;
       }
       else
@@ -95,10 +94,9 @@ namespace dataflow
     {
       // eval PHI->getIncomingValue(i), manipulate Mem
       Value *V = PHI->getIncomingValue(i);
-      Domain *d;
+      Domain *d = new Domain();
       if (Mem->find(variable(cv)) == Mem->end())
       {
-        d = &Domain();
         d->Value = Domain::Uninit;
       }
       else
