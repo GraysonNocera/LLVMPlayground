@@ -16,30 +16,43 @@ namespace dataflow
    * 5. Define "check" that checks if a given instruction is erroneous or not.
    */
 
+  void printMemory(Memory *m1)
+  {
+    outs() << "Printing Memory:\n";
+    for (auto pair = m1->begin(); pair != m1->end(); ++pair)
+    {
+      char str[1024];
+      sprintf(str, "\t%20s -> %d\n", pair->first.c_str(), pair->second->Value);
+      outs() << str;
+    }
+    outs() << "\n";
+  }
+
   // define the following functions if needed (not compulsory to do so)
   Memory *join(Memory *M1, Memory *M2)
   {
     Memory *Result = new Memory();
-    /* Add your code here */
 
     for (auto pair = M1->begin(); pair != M1->end(); ++pair)
     {
       Result->insert({pair->first, pair->second});
     }
+
     for (auto pair = M2->begin(); pair != M2->end(); ++pair)
     {
       if (Result->find(pair->first) == Result->end())
       {
-        Domain *d = Domain::join(Result->at(pair->first), pair->second);
-        Result->insert({pair->first, d});
+        // cannot find M2 key in M1, so we call it Uninit in M1
+        // Domain *d = Domain::join(new Domain(Domain::Uninit), pair->second);
+        Result->insert({pair->first, pair->second});
       }
       else
       {
-        Result->insert({pair->first, pair->second});
+        // it is in both hashmaps
+        Domain *d = Domain::join(Result->at(pair->first), pair->second);
+        Result->insert({pair->first, d});
       }
     }
-
-    /* Result will be the union of memories M1 and M2 */
 
     return Result;
   }
@@ -50,10 +63,6 @@ namespace dataflow
     /* Return true if the two memories M1 and M2 are equal */
     // merge m2 into m1, then check if m1 equals the previous m1
 
-    // for (auto m1 = M1->begin(), m2 = M2->begin();
-    //      m1 != M1->end() || m2 != M2->end(); ++m1, ++m2)
-    // {
-    // }
     if (M1->size() != M2->size())
     {
       return false;
@@ -77,36 +86,29 @@ namespace dataflow
 
   void DivZeroAnalysis::flowIn(Instruction *I, Memory *In)
   {
-    /* Add your code here */
     // joining all OUT sets of incoming flows and saving the result in the In set
     std::vector<Instruction *> predecessors = getPredecessors(I);
-    Domain d = Domain(Domain::Uninit);
     Memory *joined = NULL;
     for (Instruction *predecessor : predecessors)
     {
       // populate In, which is a hash table {string : Domain *}
       Memory *outN = OutMap[predecessor];
+      printMemory(outN);
       if (!joined)
       {
         joined = outN;
       }
       joined = join(joined, outN);
-      // // Domain *temp = outN->at(variable(predecessor));
-      // if (d.Value == Domain::Uninit)
-      // {
-      //   d = *temp;
-      // }
-      // else
-      // {
-      //   d = *Domain::join(&d, temp);
-      // }
     }
+    if (!joined)
+    {
+      return;
+    }
+
     for (auto pair = joined->begin(); pair != joined->end(); ++pair)
     {
       In->insert({pair->first, pair->second});
     }
-    // union the IN with the OUT
-    // In->insert({variable(I), &d});
   }
 
   void DivZeroAnalysis::transfer(Instruction *I, const Memory *In, Memory *NOut)
@@ -119,7 +121,7 @@ namespace dataflow
 
     if (BinaryOperator *BO = dyn_cast<BinaryOperator>(I))
     {
-      outs() << "Binary operator \n";
+      outs() << "Binary operator\n";
       Value *op1 = BO->getOperand(0);
       Value *op2 = BO->getOperand(1);
       Domain *d1 = new Domain(Domain::Uninit);
@@ -127,11 +129,14 @@ namespace dataflow
 
       // rational: if we find the variable in incoming hashmap, use it,
       // otherwise, if we see a constant, set that domain explicitly
+      ConstantInt *int1 = nullptr;
+      ConstantInt *int2 = nullptr;
       if (In->find(variable(op1)) == In->end())
       {
         if (ConstantInt *i = dyn_cast<ConstantInt>(op1))
         {
           d1->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+          int1 = i;
         }
       }
       else
@@ -144,16 +149,31 @@ namespace dataflow
         if (ConstantInt *i = dyn_cast<ConstantInt>(op2))
         {
           d2->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+          int2 = i;
         }
       }
       else
       {
         d2 = In->at(variable(op2));
       }
+      outs() << "Parsed d1, d2 = " << d1->Value << " " << d2->Value << "\n";
+
+      if (int1 && int2)
+      {
+        APInt a1 = int1->getValue();
+        APInt a2 = int2->getValue();
+        if ((a1.isStrictlyPositive() && a2.isStrictlyPositive()) || (a1.isNegative() && a2.isNegative()))
+        {
+          // this is to induce a NonZero output
+          d1->Value = Domain::Zero;
+          d2->Value = Domain::NonZero;
+        }
+      }
 
       switch (BO->getOpcode())
       {
       case Instruction::Add:
+        outs() << "adding " << d1->Value << " " << d2->Value << "\n";
         NOut->insert({variable(I), Domain::add(d1, d2)});
         break;
       case Instruction::Sub:
@@ -171,6 +191,7 @@ namespace dataflow
     }
     else if (CastInst *CastI = dyn_cast<CastInst>(I))
     {
+      outs() << "Cast int\n";
       // not worrying about overflow and underflow here
       Value *op1 = CastI->getOperand(0);
       Domain *d = new Domain(Domain::Uninit);
@@ -189,8 +210,9 @@ namespace dataflow
     }
     else if (CmpInst *CmpI = dyn_cast<CmpInst>(I))
     {
-      Value *op1 = BO->getOperand(0);
-      Value *op2 = BO->getOperand(1);
+      outs() << "compare inst\n";
+      Value *op1 = CmpI->getOperand(0);
+      Value *op2 = CmpI->getOperand(1);
       Domain *d1 = new Domain(Domain::Uninit);
       Domain *d2 = new Domain(Domain::Uninit);
       Domain *d3 = new Domain(Domain::Uninit);
@@ -220,6 +242,7 @@ namespace dataflow
       {
         d2 = In->at(variable(op2));
       }
+      outs() << "got d2: " << d2->Value << " and d3: " << d3->Value << "\n";
 
       if (d1->Value == Domain::MaybeZero || d2->Value == Domain::MaybeZero)
       {
@@ -293,16 +316,20 @@ namespace dataflow
     }
     else if (BranchInst *BI = dyn_cast<BranchInst>(I))
     {
+      outs() << "branch inst\n";
       // nothing to do here? we don't get any new variables or anything
     }
     else if (isInput(I))
     {
+      outs() << "getchar()\n";
       // getchar() returns int -> maybeZero
       Domain *d = new Domain(Domain::MaybeZero);
+      outs() << "d->Value" << d->Value << "\n";
       NOut->insert({variable(I), d});
     }
     else if (PHINode *P = dyn_cast<PHINode>(I))
     {
+      outs() << "phi node\n";
       // evalPhiNode manipulated NOut
       Domain *d = evalPhiNode(P, NOut);
     }
@@ -310,7 +337,8 @@ namespace dataflow
 
   void DivZeroAnalysis::flowOut(Instruction *I, Memory *Pre, Memory *Post, SetVector<Instruction *> &WorkSet)
   {
-    /* Add your code here */
+    printMemory(Pre);
+    printMemory(Post);
     bool isEqual = equal(Pre, Post);
     if (!isEqual)
     {
@@ -318,9 +346,11 @@ namespace dataflow
       WorkSet.insert(I);
     }
 
-    Memory *mem = OutMap[I];
-    Memory *joined = join(mem, Post);
-    OutMap[I] = joined;
+    // I'm confused by this
+    for (auto pair = Post->begin(); pair != Post->end(); ++pair)
+    {
+      OutMap[I]->insert({pair->first, pair->second});
+    }
   }
 
   void DivZeroAnalysis::doAnalysis(Function &F)
@@ -331,9 +361,6 @@ namespace dataflow
       I->dump();
       outs() << I->getType() << I->getName() << "\n";
       WorkSet.insert(&(*I));
-      // if (BinaryOperator *BO = dyn_cast<BinaryOperator *>(I)) {
-      //   outs() << "Binary operator: " << *BO << "\n";
-      // }
     }
 
     /* Add your code here */
@@ -346,40 +373,82 @@ namespace dataflow
     */
     while (WorkSet.size() > 0)
     {
-      Instruction *I = WorkSet.back();
-      WorkSet.pop_back();
+      Instruction *I = WorkSet.front();
+      WorkSet.remove(I);
+      Memory *in = new Memory();
+      Memory *out = new Memory();
 
-      flowIn(I, InMap[I]);
+      outs() << "PROCESSING I: \n";
+      I->dump();
+      outs() << "\n";
+      outs() << "first flow in " << Domain::Zero << "\n";
 
-      transfer(I, InMap[I], OutMap[I]);
+      flowIn(I, in);
+      InMap[I] = in;
 
-      flowOut(I, InMap[I], OutMap[I], WorkSet);
+      outs() << "after flowIn: ";
+      printMemory(InMap[I]);
+
+      outs() << "transfer\n";
+
+      Memory *pre = OutMap[I];
+      transfer(I, in, out);
+
+      outs() << "after transfer: ";
+      printMemory(in);
+      printMemory(out);
+
+      outs() << "flowOut\n";
+      flowOut(I, pre, out, WorkSet);
+      outs() << "flow out: ";
+      printMemory(OutMap[I]);
     }
   }
 
   bool DivZeroAnalysis::check(Instruction *I)
   {
-    /* Add your code here */
     Memory *mem = InMap[I];
-    Domain *d = mem->at(variable(I));
     if (BinaryOperator *BO = dyn_cast<BinaryOperator>(I))
     {
       switch (BO->getOpcode())
       {
       case Instruction::SDiv:
       case Instruction::UDiv:
+        outs() << "checking for errors \n";
         Value *op1 = BO->getOperand(0);
         Value *op2 = BO->getOperand(1);
-        // int *i = cast<int>(op2);
-        // Domain *res = Domain::abstract(*i);
-        // if (res->Value == Domain::Zero)
-        // {
-        //   return true;
-        // }
-        Domain *d = new Domain(Domain::Uninit);
-      }
+        Domain *d1 = new Domain(Domain::Uninit);
+        Domain *d2 = new Domain(Domain::Uninit);
+        if (mem->find(variable(op1)) == mem->end())
+        {
+          if (ConstantInt *i = dyn_cast<ConstantInt>(op1))
+          {
+            d1->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+          }
+        }
+        else
+        {
+          d1 = mem->at(variable(op1));
+        }
+        if (mem->find(variable(op2)) == mem->end())
+        {
+          if (ConstantInt *i = dyn_cast<ConstantInt>(op2))
+          {
+            d2->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+          }
+        }
+        else
+        {
+          d2 = mem->at(variable(op2));
+        }
 
-      return false;
+        // actual check for division by 0 occurs here
+        if (d2->Value == Domain::Zero || d2->Value == Domain::MaybeZero)
+        {
+          outs() << "DIVISION BY 0\n";
+          return true;
+        }
+      }
     }
     return false;
   }

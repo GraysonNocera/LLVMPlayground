@@ -70,6 +70,7 @@ namespace dataflow
     return false;
   }
 
+// TODO: move this to DivZero file?
   Domain *DataflowAnalysis::evalPhiNode(PHINode *PHI, Memory *Mem)
   {
     Value *cv = PHI->hasConstantValue();
