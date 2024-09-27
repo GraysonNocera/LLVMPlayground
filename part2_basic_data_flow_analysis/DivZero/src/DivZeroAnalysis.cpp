@@ -49,8 +49,17 @@ namespace dataflow
       else
       {
         // it is in both hashmaps
-        Domain *d = Domain::join(Result->at(pair->first), pair->second);
-        Result->insert({pair->first, d});
+        Domain *m1d = Result->at(pair->first);
+        if (m1d->Value == Domain::Uninit)
+        {
+          Result->insert({pair->first, pair->second});
+        }
+        else
+        {
+
+          Domain *d = Domain::join(Result->at(pair->first), pair->second);
+          Result->insert({pair->first, d});
+        }
       }
     }
 

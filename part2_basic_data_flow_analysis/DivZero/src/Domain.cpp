@@ -111,8 +111,11 @@ dataflow::Domain *dataflow::Domain::join(Domain *E1, Domain *E2)
     // if they are the same, it's just that
     // if one is 0 and one is nonzero, maybezero
 
-    if (e1 == dataflow::Domain::Uninit || e2 == dataflow::Domain::Uninit || e1 == dataflow::Domain::MaybeZero || e2 == dataflow::Domain::MaybeZero)
-    {
+    if (e1 == dataflow::Domain::Uninit) {
+        e3->Value = e2;
+    } else if (e2 == dataflow::Domain::Uninit) {
+        e3->Value = e1;
+    } else if (e1 == dataflow::Domain::MaybeZero || e2 == dataflow::Domain::MaybeZero) {
         e3->Value = dataflow::Domain::MaybeZero;
     } else if (e1 == e2) {
         e3->Value = e1;
