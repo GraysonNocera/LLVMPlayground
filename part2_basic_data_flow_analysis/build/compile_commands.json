@@ -1,0 +1,17 @@
+[
+{
+  "directory": "/root/LLVMPlayground/part2_basic_data_flow_analysis/build/DivZero",
+  "command": "/usr/bin/c++ -DDataflowPass_EXPORTS -I/usr/lib/llvm-12/include -I/root/LLVMPlayground/part2_basic_data_flow_analysis/DivZero/include -std=c++14 -D__GLIBCXX_USE_CXX11_ABI=0 -O3 -fno-rtti -fPIC   -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -g -std=gnu++14 -o CMakeFiles/DataflowPass.dir/src/DataflowAnalysis.cpp.o -c /root/LLVMPlayground/part2_basic_data_flow_analysis/DivZero/src/DataflowAnalysis.cpp",
+  "file": "/root/LLVMPlayground/part2_basic_data_flow_analysis/DivZero/src/DataflowAnalysis.cpp"
+},
+{
+  "directory": "/root/LLVMPlayground/part2_basic_data_flow_analysis/build/DivZero",
+  "command": "/usr/bin/c++ -DDataflowPass_EXPORTS -I/usr/lib/llvm-12/include -I/root/LLVMPlayground/part2_basic_data_flow_analysis/DivZero/include -std=c++14 -D__GLIBCXX_USE_CXX11_ABI=0 -O3 -fno-rtti -fPIC   -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -g -std=gnu++14 -o CMakeFiles/DataflowPass.dir/src/DivZeroAnalysis.cpp.o -c /root/LLVMPlayground/part2_basic_data_flow_analysis/DivZero/src/DivZeroAnalysis.cpp",
+  "file": "/root/LLVMPlayground/part2_basic_data_flow_analysis/DivZero/src/DivZeroAnalysis.cpp"
+},
+{
+  "directory": "/root/LLVMPlayground/part2_basic_data_flow_analysis/build/DivZero",
+  "command": "/usr/bin/c++ -DDataflowPass_EXPORTS -I/usr/lib/llvm-12/include -I/root/LLVMPlayground/part2_basic_data_flow_analysis/DivZero/include -std=c++14 -D__GLIBCXX_USE_CXX11_ABI=0 -O3 -fno-rtti -fPIC   -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -g -std=gnu++14 -o CMakeFiles/DataflowPass.dir/src/Domain.cpp.o -c /root/LLVMPlayground/part2_basic_data_flow_analysis/DivZero/src/Domain.cpp",
+  "file": "/root/LLVMPlayground/part2_basic_data_flow_analysis/DivZero/src/Domain.cpp"
+}
+]
