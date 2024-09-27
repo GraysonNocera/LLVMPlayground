@@ -122,6 +122,12 @@ namespace dataflow
         CI->getOperand(0)->dump();
         CI->getDestTy()->dump();
       }
+      if (CallInst *CI = dyn_cast<CallInst>(&*I)) {
+        outs() << "CALL INSTRUCTION\n";
+        outs() << CI->getTailCallKind() << "\n"; // idk what tail call is
+        CI->getType()->dump(); // gets the return type of this call
+        outs() << CI->canReturnTwice() << "\n";
+      }
       WorkSet.insert(&(*I));
       outs() << "\n\n\n";
     }
