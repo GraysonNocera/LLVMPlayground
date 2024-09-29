@@ -123,7 +123,6 @@ namespace dataflow
                                  PointerAnalysis *PA,
                                  SetVector<Value *> PointerSet)
   {
-    /* Add your code here */
     for (auto in = In->begin(); in != In->end(); in++)
     {
       NOut->insert({in->first, in->second});
@@ -336,6 +335,18 @@ namespace dataflow
       Domain *d = new Domain(Domain::MaybeZero);
       outs() << "d->Value" << d->Value << "\n";
       NOut->insert({variable(I), d});
+    } else if (CallInst *CI = dyn_cast<CallInst>(I)) {
+      if (!CI->getFunctionType()->getReturnType()->isIntegerTy()) {
+        return;
+      }
+
+      
+    } else if (AllocaInst *AI = dyn_cast<AllocaInst>(I)) {
+
+    } else if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
+
+    } else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
+
     }
   }
 
@@ -376,6 +387,38 @@ namespace dataflow
          Based on the previous Out memory and the current Out memory, check if there is a difference between the two and
            flow the memory set appropriately to all successors of I and update WorkSet accordingly
     */
+    while (WorkSet.size() > 0)
+    {
+      Instruction *I = WorkSet.front();
+      WorkSet.remove(I);
+      Memory *in = new Memory();
+      Memory *out = new Memory();
+
+      outs() << "PROCESSING I: \n";
+      I->dump();
+      outs() << "\n";
+      outs() << "first flow in " << Domain::Zero << "\n";
+
+      flowIn(I, in);
+      InMap[I] = in;
+
+      outs() << "after flowIn: ";
+      printMemory(InMap[I]);
+
+      outs() << "transfer\n";
+
+      Memory *pre = OutMap[I];
+      transfer(I, in, out, PA, PointerSet);
+
+      outs() << "after transfer: ";
+      printMemory(in);
+      printMemory(out);
+
+      outs() << "flowOut\n";
+      flowOut(I, pre, out, WorkSet);
+      outs() << "flow out: ";
+      printMemory(OutMap[I]);
+    }
   }
 
   bool DivZeroAnalysis::check(Instruction *I)
