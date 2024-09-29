@@ -18,6 +18,7 @@ protected:
   void flowOut(Instruction *I, Memory *In, Memory *NOut,  SetVector <Instruction *> &);
 
   bool check(Instruction *I) override;
+  Domain *evalPhiNode(PHINode *PHI, Memory *Mem);
 
   std::string getAnalysisName() override { return "DivZero"; }
 };

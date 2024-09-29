@@ -466,4 +466,53 @@ namespace dataflow
   static RegisterPass<DivZeroAnalysis> X("DivZero", "Divide-by-zero Analysis",
                                          false, false);
 
+  // TODO: move this to DivZero file?
+  Domain *DivZeroAnalysis::evalPhiNode(PHINode *PHI, Memory *Mem)
+  {
+    Value *cv = PHI->hasConstantValue();
+    if (cv)
+    {
+      Domain *d = new Domain(Domain::Uninit);
+      if (Mem->find(variable(cv)) == Mem->end())
+      {
+        if (ConstantInt *i = dyn_cast<ConstantInt>(cv))
+        {
+          d->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+        }
+      }
+      else
+      {
+        d = Mem->at(variable(cv));
+      }
+      Mem->insert({variable(PHI), d});
+      return d;
+    }
+
+    unsigned int n = PHI->getNumIncomingValues();
+    Domain *joined = nullptr;
+    for (unsigned int i = 0; i < n; i++)
+    {
+      Value *V = PHI->getIncomingValue(i);
+      Domain *d = new Domain(Domain::Uninit);
+      if (Mem->find(variable(V)) == Mem->end())
+      {
+        if (ConstantInt *i = dyn_cast<ConstantInt>(V))
+        {
+          d->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+        }
+      }
+      else
+      {
+        d = Mem->at(variable(V));
+      }
+
+      if (!joined)
+      {
+        joined = d;
+      }
+      joined = Domain::join(joined, d);
+    }
+    Mem->insert({variable(PHI), joined});
+    return joined;
+  }
 } // namespace dataflow
