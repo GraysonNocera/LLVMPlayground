@@ -200,6 +200,16 @@ void transfer(Instruction *I, PointsToInfo &PointsTo) {
     }
     PointsTo[variable(LI)] = Result;
   }
+
+  outs() << "After handling instruction: " << variable(I) << ": \n";
+  for (auto &I : PointsTo) {
+    errs() << "  " << I.first << ": { ";
+    for (auto &J : I.second) {
+      errs() << J << "; ";
+    }
+    errs() << "}\n";
+  }
+  errs() << "\n";
 }
 
 int countFacts(PointsToInfo &PointsTo) {
