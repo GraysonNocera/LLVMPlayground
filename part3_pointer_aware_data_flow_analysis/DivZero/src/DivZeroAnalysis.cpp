@@ -350,10 +350,12 @@ namespace dataflow
     else if (LoadInst *LI = dyn_cast<LoadInst>(I))
     {
       Value *FromPtr = LI->getPointerOperand();
-      if (FromPtr->getType()->isIntegerTy())
+      Domain *d = new Domain(Domain::Uninit);
+      outs() << "load type ";
+      LI->getType()->dump();
+      if (LI->getType()->isIntegerTy())
       {
         Value *LoadedInt = FromPtr;
-        Domain *d = new Domain(Domain::Uninit);
         if (In->find(variable(LoadedInt)) == In->end())
         {
           // IDK if this actually possible, can loads have a constant value
@@ -370,51 +372,78 @@ namespace dataflow
       else if (FromPtr->getType()->isPointerTy())
       {
         outs() << "a load with a pointer!\n";
-        Domain *d = nullptr;
-        for (Instruction &I : PointerSet)
+        d = nullptr;
+        for (Value *V : PointerSet)
         {
-          if (PA->alias(address(I), address(FromPtr)))
+          std::string a = address(V);
+          std::string b = address(FromPtr);
+          if (PA->alias(a, b))
           {
             // update abstract values
             if (!d)
             {
-              d = In->at(I);
+              outs() << "is it here?\n";
+              d = In->at(variable(V));
             }
-            d = Domain::join(d, In->at(I));
+            d = Domain::join(d, In->at(variable(V)));
           }
         }
+        if (!d) {
+          d = new Domain(Domain::Uninit);
+        }
+        outs() << "value of d: " << d << "\n";
       }
       NOut->insert({variable(I), d});
     }
     else if (StoreInst *SI = dyn_cast<StoreInst>(I))
     {
       // for a store, setup:
-      // get the abstract domain value of the value operand
-      // update everything that is an alias of Ptr and
+
       Value *Ptr = SI->getPointerOperand();
       Value *Val = SI->getValueOperand();
-      Domain *domainVal = new Domain();
-      if (In->find(variable(Val)) == In->end())
+      Domain *domainVal = new Domain(Domain::Uninit);
+      if (Val->getType()->isIntegerTy())
       {
-        if (ConstantInt *i = dyn_cast<ConstantInt>(Val))
+        // if integery type:
+        // get the abstract domain value of the value operand
+        // update the Ptr operand's out to be domain value of value operand
+        if (In->find(variable(Val)) == In->end())
         {
-          domainVal->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+          if (ConstantInt *i = dyn_cast<ConstantInt>(Val))
+          {
+            domainVal->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+          }
         }
-      }
-      
-      else
-      {
-        domainVal = In->at(variable(op2));
-      }
-
-      for (Instruction &I : PointerSet)
-      {
-        if (PA->alias(address(I), address(Ptr)))
+        else
         {
-          // update abstract values
+          domainVal = In->at(variable(Val));
+        }
+        NOut->insert({variable(Ptr), domainVal});
+      }
+      else if (Val->getType()->isPointerTy())
+      {
+        outs() << "oh boy it's here\n";
+        Domain *domainVal = In->at(variable(Val));
+        SetVector<Value *> aliases;
+        for (Value *V : PointerSet)
+        {
+          std::string a = address(V);
+          std::string b = address(Ptr);
+          if (PA->alias(a, b))
+          {
+            // join the current domainValue with the domainValue at each alias of pointer
+            domainVal = Domain::join(domainVal, In->at(variable(V)));
+            aliases.insert(V);
+          }
+        }
+        NOut->insert({variable(Ptr), domainVal});
+        for (Value *V : aliases)
+        {
+          NOut->insert({variable(V), domainVal});
         }
       }
     }
+    printMemory(NOut);
   }
 
   void DivZeroAnalysis::flowOut(Instruction *I, Memory *Pre, Memory *Post, SetVector<Instruction *> &WorkSet)
@@ -482,29 +511,29 @@ namespace dataflow
       Memory *out = new Memory();
 
       // DEBUGGING
-      // outs() << "PROCESSING I: \n";
-      // I->dump();
-      // outs() << "\n";
-      // outs() << "first flow in " << Domain::Zero << "\n";
+      outs() << "PROCESSING I: \n";
+      I->dump();
+      outs() << "\n";
+      outs() << "first flow in \n";
       // DEBUGGING
 
       flowIn(I, in);
       InMap[I] = in;
 
       // DEBUGGING
-      // outs() << "after flowIn: ";
-      // printMemory(InMap[I]);
-      // outs() << "transfer\n";
+      outs() << "after flowIn: ";
+      printMemory(InMap[I]);
+      outs() << "transfer\n";
       // DEBUGGING
 
       Memory *pre = OutMap[I];
       transfer(I, in, out, PA, PointerSet);
 
       // DEBUGGING
-      // outs() << "after transfer: ";
-      // printMemory(in);
-      // printMemory(out);
-      // outs() << "flowOut\n";
+      outs() << "after transfer: ";
+      printMemory(in);
+      printMemory(out);
+      outs() << "flowOut\n\n\n";
       // DEBUGGING
 
       flowOut(I, pre, out, WorkSet);
