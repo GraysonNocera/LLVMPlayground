@@ -401,6 +401,7 @@ namespace dataflow
           domainVal->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
         }
       }
+      
       else
       {
         domainVal = In->at(variable(op2));
