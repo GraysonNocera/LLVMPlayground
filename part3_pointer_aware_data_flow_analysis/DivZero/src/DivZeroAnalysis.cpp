@@ -55,7 +55,6 @@ namespace dataflow
         }
         else
         {
-
           Domain *d = Domain::join(Result->at(pair->first), pair->second);
           Result->insert({pair->first, d});
         }
@@ -335,18 +334,27 @@ namespace dataflow
       Domain *d = new Domain(Domain::MaybeZero);
       outs() << "d->Value" << d->Value << "\n";
       NOut->insert({variable(I), d});
-    } else if (CallInst *CI = dyn_cast<CallInst>(I)) {
-      if (!CI->getFunctionType()->getReturnType()->isIntegerTy()) {
+    }
+    else if (CallInst *CI = dyn_cast<CallInst>(I))
+    {
+      if (!CI->getFunctionType()->getReturnType()->isIntegerTy())
+      {
         return;
       }
-
-      
-    } else if (AllocaInst *AI = dyn_cast<AllocaInst>(I)) {
-
-    } else if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
-
-    } else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
-
+      Domain *d = new Domain(Domain::MaybeZero);
+      // because we don't know what happened in this function, we just assign
+      // the return type to be MaybeZero because it could be
+      NOut->insert({variable(I), d});
+    }
+    else if (AllocaInst *AI = dyn_cast<AllocaInst>(I))
+    {
+      // TODO: do we need this?
+    }
+    else if (LoadInst *LI = dyn_cast<LoadInst>(I))
+    {
+    }
+    else if (StoreInst *SI = dyn_cast<StoreInst>(I))
+    {
     }
   }
 
@@ -379,6 +387,21 @@ namespace dataflow
       PointerSet.insert(&(*I));
     }
 
+    // handle function arguments here, we won't handle alloca instructions in flowIn, transfer, or flowOut,
+    // so we instantiate them here
+    for (Function::arg_iterator A = F.arg_begin(), E = F.arg_end(); A != E; ++A)
+    {
+      Argument &Arg = *A;
+      outs() << "argument: " << Arg.getName() << "\n";
+
+      // initialize each argument to MaybeZero because we know nothing about it
+      Memory *M = new Memory();
+      Domain *d1 = new Domain(Domain::MaybeZero);
+      M->insert({variable(&Arg), d1});
+
+      InMap[cast<Instruction>(&Arg)] = M;
+    }
+
     /* Add your code here */
     /* Basic Workflow-
          Visit instruction in WorkSet
@@ -394,28 +417,35 @@ namespace dataflow
       Memory *in = new Memory();
       Memory *out = new Memory();
 
+      // DEBUGGING
       outs() << "PROCESSING I: \n";
       I->dump();
       outs() << "\n";
       outs() << "first flow in " << Domain::Zero << "\n";
+      // DEBUGGING
 
       flowIn(I, in);
       InMap[I] = in;
 
+      // DEBUGGING
       outs() << "after flowIn: ";
       printMemory(InMap[I]);
-
       outs() << "transfer\n";
+      // DEBUGGING
 
       Memory *pre = OutMap[I];
       transfer(I, in, out, PA, PointerSet);
 
+      // DEBUGGING
       outs() << "after transfer: ";
       printMemory(in);
       printMemory(out);
-
       outs() << "flowOut\n";
+      // DEBUGGING
+
       flowOut(I, pre, out, WorkSet);
+
+      // DEBUGGING
       outs() << "flow out: ";
       printMemory(OutMap[I]);
     }
