@@ -225,8 +225,10 @@ void print(std::map<std::string, PointsToSet> &PointsTo) {
 PointerAnalysis::PointerAnalysis(Function &F) {
   int NumOfOldFacts = 0;
   int NumOfNewFacts = 0;
+  // this just keeps going until things converge it seems
   while (true) {
     for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I) {
+      // already calls transfer function, we don't need to!!
       transfer(&*I, PointsTo);
     }
     NumOfNewFacts = countFacts(PointsTo);
