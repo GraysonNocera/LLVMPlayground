@@ -392,6 +392,11 @@ namespace dataflow
     for (Function::arg_iterator A = F.arg_begin(), E = F.arg_end(); A != E; ++A)
     {
       Argument &Arg = *A;
+      if (!Arg.getType()->isIntegerTy())
+      {
+        // skip non-integer types
+        continue;
+      }
       outs() << "argument: " << Arg.getName() << "\n";
 
       // initialize each argument to MaybeZero because we know nothing about it
