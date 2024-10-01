@@ -14,11 +14,13 @@ namespace instrument
   void instrumentSanitize(Module *M, Function &F, Instruction &I)
   {
     /* Add you code here */
-    // insert a sanitize check for a supplied instruction
-
     std::vector<Type *> Params(3, Type::getInt32Ty(M->getContext()));
     std::vector<Value *> Args(3);
     DebugLoc d = I.getDebugLoc();
+    if (!d)
+    {
+      return;
+    }
 
     IntegerType *i32 = IntegerType::getInt32Ty(M->getContext());
     ConstantInt *line = ConstantInt::get(i32, d.getLine());
@@ -29,8 +31,8 @@ namespace instrument
     Args[2] = col;
 
     FunctionType *FT = FunctionType::get(Type::getVoidTy(M->getContext()), Params, false);
-    FunctionCallee f = M->getOrInsertFunction("__sanitize__", FT);
-    CallInst *Call = CallInst::Create(f, Args, "__sanitize__", &I);
+    FunctionCallee f = M->getOrInsertFunction(SanitizerFunctionName, FT);
+    CallInst *Call = CallInst::Create(f, Args, "", &I);
     Call->setCallingConv(CallingConv::C);
     Call->setTailCall(true);
   }
@@ -44,6 +46,10 @@ namespace instrument
     std::vector<Type *> Params(2, Type::getInt32Ty(M->getContext()));
     std::vector<Value *> Args(2);
     DebugLoc d = I.getDebugLoc();
+    if (!d)
+    {
+      return;
+    }
 
     IntegerType *i32 = IntegerType::getInt32Ty(M->getContext());
     ConstantInt *line = ConstantInt::get(i32, d.getLine());
@@ -53,8 +59,8 @@ namespace instrument
     Args[1] = col;
 
     FunctionType *FT = FunctionType::get(Type::getVoidTy(M->getContext()), Params, false);
-    FunctionCallee f = M->getOrInsertFunction("__coverage__", FT);
-    CallInst *Call = CallInst::Create(f, Args, "__coverage__", &I);
+    FunctionCallee f = M->getOrInsertFunction(CoverageFunctionName, FT);
+    CallInst *Call = CallInst::Create(f, Args, "", &I);
     Call->setCallingConv(CallingConv::C);
     Call->setTailCall(true);
   }
@@ -74,11 +80,9 @@ namespace instrument
         {
         case Instruction::SDiv:
         case Instruction::UDiv:
-          outs() << "creating sanitize function\n";
           instrumentSanitize(M, F, Inst);
         }
       }
-
       instrumentCoverage(M, F, Inst);
     }
 

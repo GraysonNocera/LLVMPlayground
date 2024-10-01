@@ -1,0 +1,1 @@
+/usr/bin/cc -fPIC -shared  -o libruntime.so CMakeFiles/runtime.dir/lib/runtime.c.o 
