@@ -1,10 +1,11 @@
 #!/bin/bash
 
+set -e
+
 cd ~/LLVMPlayground/part3_pointer_aware_data_flow_analysis
-mkdir build
 cd build
 cmake -DUSE_REFERENCE=OFF ..
-make
+make 
 
 # input is path to C program
 cd ~/LLVMPlayground/part3_pointer_aware_data_flow_analysis/DivZero/test

@@ -84,6 +84,7 @@ namespace dataflow
 
     if (M1->size() != M2->size())
     {
+      outs() << "unequal sizes\n";
       return false;
     }
     for (auto m1 = M1->begin(); m1 != M1->end(); ++m1)
@@ -91,11 +92,13 @@ namespace dataflow
       if (M2->find(m1->first) == M2->end())
       {
         // couldn't find M1 key in M2, thus return false
+        outs() << "couldn't find M1 key " << m1->first << " in M2, thus return false\n";
         return false;
       }
       if (M2->at(m1->first)->Value != M1->at(m1->first)->Value)
       {
         // if the values here are not equal, return false
+        outs() << "values here are not equal," << m1->first << " return false\n";
         return false;
       }
     }
@@ -508,8 +511,8 @@ namespace dataflow
 
   void DivZeroAnalysis::flowOut(Instruction *I, Memory *Pre, Memory *Post, SetVector<Instruction *> &WorkSet)
   {
-    // printMemory(Pre);
-    // printMemory(Post);
+    printMemory(Pre);
+    printMemory(Post);
     bool isEqual = equal(Pre, Post);
     if (!isEqual)
     {
@@ -520,6 +523,7 @@ namespace dataflow
     // I'm confused by this
     for (auto pair = Post->begin(); pair != Post->end(); ++pair)
     {
+      OutMap[I]->erase(pair->first);
       OutMap[I]->insert({pair->first, pair->second});
     }
   }
@@ -595,21 +599,22 @@ namespace dataflow
       // DEBUGGING
 
       Memory *pre = OutMap[I];
-      printMemory(in);
+      printMemory(pre);
       transfer(I, in, out, PA, PointerSet);
 
       // DEBUGGING
       outs() << "after transfer: ";
       printMemory(in);
       printMemory(out);
-      outs() << "flowOut\n\n\n";
+      outs() << "flowOut\n";
       // DEBUGGING
 
       flowOut(I, pre, out, WorkSet);
 
       // DEBUGGING
-      outs() << "flow out: ";
+      outs() << "flow out: \n";
       printMemory(OutMap[I]);
+      outs() << "\n\n\n";
     }
   }
 
