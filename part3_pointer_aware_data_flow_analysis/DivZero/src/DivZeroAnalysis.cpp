@@ -27,6 +27,17 @@ namespace dataflow
     }
     outs() << "\n";
   }
+  void printMemoryConst(const Memory *m1)
+  {
+    outs() << "Printing Memory:\n";
+    for (auto pair = m1->begin(); pair != m1->end(); ++pair)
+    {
+      char str[1024];
+      sprintf(str, "\t%20s -> %d\n", pair->first.c_str(), pair->second->Value);
+      outs() << str;
+    }
+    outs() << "\n";
+  }
 
   Memory *join(Memory *M1, Memory *M2)
   {
@@ -41,8 +52,7 @@ namespace dataflow
     {
       if (Result->find(pair->first) == Result->end())
       {
-        // cannot find M2 key in M1, so we call it Uninit in M1
-        // Domain *d = Domain::join(new Domain(Domain::Uninit), pair->second);
+        // it was not in M1, so we insert it
         Result->insert({pair->first, pair->second});
       }
       else
@@ -51,11 +61,13 @@ namespace dataflow
         Domain *m1d = Result->at(pair->first);
         if (m1d->Value == Domain::Uninit)
         {
+          Result->erase(pair->first);
           Result->insert({pair->first, pair->second});
         }
         else
         {
           Domain *d = Domain::join(Result->at(pair->first), pair->second);
+          Result->erase(pair->first);
           Result->insert({pair->first, d});
         }
       }
@@ -93,6 +105,7 @@ namespace dataflow
 
   void DivZeroAnalysis::flowIn(Instruction *I, Memory *In)
   {
+    outs() << "FLOW IN\n";
     // joining all OUT sets of incoming flows and saving the result in the In set
     std::vector<Instruction *> predecessors = getPredecessors(I);
     Memory *joined = NULL;
@@ -100,7 +113,7 @@ namespace dataflow
     {
       // populate In, which is a hash table {string : Domain *}
       Memory *outN = OutMap[predecessor];
-      // printMemory(outN);
+      printMemory(outN);
       if (!joined)
       {
         joined = outN;
@@ -110,7 +123,8 @@ namespace dataflow
     if (!joined)
     {
       return;
-    }
+    } 
+    printMemory(joined);
 
     for (auto pair = joined->begin(); pair != joined->end(); ++pair)
     {
@@ -363,6 +377,10 @@ namespace dataflow
           {
             d->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
           }
+          else if (Argument *a = dyn_cast<Argument>(LoadedInt))
+          {
+            d->Value = Domain::MaybeZero;
+          }
         }
         else
         {
@@ -372,26 +390,16 @@ namespace dataflow
       else if (FromPtr->getType()->isPointerTy())
       {
         outs() << "a load with a pointer!\n";
-        d = nullptr;
-        for (Value *V : PointerSet)
+        std::map<std::string, Domain *>::const_iterator i = In->find(variable(FromPtr));
+        if (i != In->end())
         {
-          std::string a = address(V);
-          std::string b = address(FromPtr);
-          if (PA->alias(a, b))
-          {
-            // update abstract values
-            if (!d)
-            {
-              outs() << "is it here?\n";
-              d = In->at(variable(V));
-            }
-            d = Domain::join(d, In->at(variable(V)));
-          }
+          d = new Domain(i->second->Value);
         }
-        if (!d) {
+        else
+        {
           d = new Domain(Domain::Uninit);
         }
-        outs() << "value of d: " << d << "\n";
+        outs() << "value of d: " << d->Value << "\n";
       }
       NOut->insert({variable(I), d});
     }
@@ -401,7 +409,10 @@ namespace dataflow
 
       Value *Ptr = SI->getPointerOperand();
       Value *Val = SI->getValueOperand();
+      Ptr->dump();
+      Val->dump();
       Domain *domainVal = new Domain(Domain::Uninit);
+      Domain *original = new Domain(Domain::Uninit);
       if (Val->getType()->isIntegerTy())
       {
         // if integery type:
@@ -412,33 +423,82 @@ namespace dataflow
           if (ConstantInt *i = dyn_cast<ConstantInt>(Val))
           {
             domainVal->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+            original = domainVal;
+          }
+          else if (Argument *a = dyn_cast<Argument>(Val))
+          {
+            domainVal->Value = Domain::MaybeZero;
+            original = domainVal;
           }
         }
         else
         {
           domainVal = In->at(variable(Val));
+          original = domainVal;
         }
-        NOut->insert({variable(Ptr), domainVal});
-      }
-      else if (Val->getType()->isPointerTy())
-      {
-        outs() << "oh boy it's here\n";
-        Domain *domainVal = In->at(variable(Val));
+        outs() << "inserting: " << variable(Ptr) << "\n";
         SetVector<Value *> aliases;
         for (Value *V : PointerSet)
         {
           std::string a = address(V);
-          std::string b = address(Ptr);
+          std::string b = variable(Ptr);
+          outs() << "aliases? " << a << " and " << b << "\n";
           if (PA->alias(a, b))
           {
+            outs() << "yes!" << "\n";
             // join the current domainValue with the domainValue at each alias of pointer
-            domainVal = Domain::join(domainVal, In->at(variable(V)));
-            aliases.insert(V);
+            std::map<std::string, Domain *>::const_iterator i = In->find(variable(V));
+            if (i != In->end())
+            {
+              outs() << "adding to alias\n";
+              domainVal = Domain::join(domainVal, i->second);
+              aliases.insert(V);
+            }
           }
         }
+        outs() << "domain value from joining: " << domainVal->Value << "\n";
+        outs() << "adding domainValue " << domainVal->Value << " to " << variable(Ptr) << "\n";
+        NOut->erase(variable(Ptr));
+        NOut->insert({variable(Ptr), original});
+        for (Value *V : aliases)
+        {
+          outs() << "adding domainValue " << domainVal->Value << " to " << variable(V) << "\n";
+          NOut->erase(variable(V));
+          NOut->insert({variable(V), original});
+        }
+      }
+      else if (Val->getType()->isPointerTy())
+      {
+        std::map<std::string, Domain *>::const_iterator i = In->find(variable(Val));
+        if (i != In->end())
+        {
+          domainVal = i->second;
+        }
+        SetVector<Value *> aliases;
+        for (Value *V : PointerSet)
+        {
+          std::string a = address(V);
+          std::string b = variable(Ptr);
+          outs() << "aliases? " << a << " and " << b << "\n";
+          if (PA->alias(a, b))
+          {
+            outs() << "yes!\n";
+            // join the current domainValue with the domainValue at each alias of pointer
+            std::map<std::string, Domain *>::const_iterator i = In->find(variable(V));
+            if (i != In->end())
+            {
+              domainVal = Domain::join(domainVal, i->second);
+              aliases.insert(V);
+            }
+          }
+        }
+        outs() << "variable PTR = " << variable(Ptr) << "\n";
+        NOut->erase(variable(Ptr));
         NOut->insert({variable(Ptr), domainVal});
         for (Value *V : aliases)
         {
+          outs() << "variable V = " << variable(V) << "\n";
+          NOut->erase(variable(V));
           NOut->insert({variable(V), domainVal});
         }
       }
@@ -492,7 +552,15 @@ namespace dataflow
       Domain *d1 = new Domain(Domain::MaybeZero);
       M->insert({variable(&Arg), d1});
 
-      InMap[cast<Instruction>(&Arg)] = M;
+      if (Instruction *I = dyn_cast<Instruction>(&*A))
+      {
+        InMap[I] = M;
+        printMemory(InMap[I]);
+      }
+      if (Value *V = dyn_cast<Value>(&*A))
+      {
+        outs() << "Value? " << V->getName() << "\n";
+      }
     }
 
     /* Add your code here */
@@ -527,6 +595,7 @@ namespace dataflow
       // DEBUGGING
 
       Memory *pre = OutMap[I];
+      printMemory(in);
       transfer(I, in, out, PA, PointerSet);
 
       // DEBUGGING
@@ -539,14 +608,15 @@ namespace dataflow
       flowOut(I, pre, out, WorkSet);
 
       // DEBUGGING
-      // outs() << "flow out: ";
-      // printMemory(OutMap[I]);
+      outs() << "flow out: ";
+      printMemory(OutMap[I]);
     }
   }
 
   bool DivZeroAnalysis::check(Instruction *I)
   {
     Memory *mem = InMap[I];
+    Domain d2 = Domain(Domain::Uninit);
     if (BinaryOperator *BO = dyn_cast<BinaryOperator>(I))
     {
       switch (BO->getOpcode())
@@ -554,35 +624,21 @@ namespace dataflow
       case Instruction::SDiv:
       case Instruction::UDiv:
         outs() << "checking for errors \n";
-        Value *op1 = BO->getOperand(0);
         Value *op2 = BO->getOperand(1);
-        Domain *d1 = new Domain(Domain::Uninit);
-        Domain *d2 = new Domain(Domain::Uninit);
-        if (mem->find(variable(op1)) == mem->end())
-        {
-          if (ConstantInt *i = dyn_cast<ConstantInt>(op1))
-          {
-            d1->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
-          }
-        }
-        else
-        {
-          d1 = mem->at(variable(op1));
-        }
         if (mem->find(variable(op2)) == mem->end())
         {
           if (ConstantInt *i = dyn_cast<ConstantInt>(op2))
           {
-            d2->Value = i->isZero() ? Domain::Zero : Domain::NonZero;
+            d2.Value = i->isZero() ? Domain::Zero : Domain::NonZero;
           }
         }
         else
         {
-          d2 = mem->at(variable(op2));
+          d2 = *(mem->at(variable(op2)));
         }
 
         // actual check for division by 0 occurs here
-        if (d2->Value == Domain::Zero || d2->Value == Domain::MaybeZero)
+        if (d2.Value == Domain::Zero || d2.Value == Domain::MaybeZero)
         {
           outs() << "DIVISION BY 0\n";
           return true;
